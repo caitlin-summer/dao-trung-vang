@@ -1,0 +1,533 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Đào Trứng Vàng Kawaii Pro - Local Leaderboard</title>
+    <link href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;700;900&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #FFB7B2;
+            --accent: #FFD93D;
+            --dark: #2B2D42;
+            --white: #FFFFFF;
+            --danger: #FF4D4D;
+        }
+        body { 
+            margin: 0; 
+            background: #f0fdf4; 
+            overflow: hidden; 
+            font-family: 'Lexend', sans-serif;
+            user-select: none;
+            touch-action: none;
+            padding-top: env(safe-area-inset-top);
+        }
+        canvas { display: block; image-rendering: -webkit-optimize-contrast; }
+
+        #hud {
+            position: absolute;
+            top: calc(10px + env(safe-area-inset-top));
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 8px;
+            z-index: 10;
+            width: 96%;
+            max-width: 650px;
+            pointer-events: none;
+        }
+
+        .hud-item {
+            background: rgba(255, 255, 255, 0.9);
+            backdrop-filter: blur(5px);
+            padding: 8px 10px;
+            border-radius: 15px;
+            color: var(--dark);
+            font-weight: 900;
+            flex: 1;
+            text-align: center;
+            border: 3px solid var(--dark);
+            font-size: 0.8rem;
+            box-shadow: 3px 3px 0px var(--dark);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 4px;
+            white-space: nowrap;
+        }
+
+        .overlay {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+            background: rgba(43, 45, 66, 0.6);
+            backdrop-filter: blur(8px);
+            padding: 20px;
+        }
+
+        .card {
+            background: #FFFFFF;
+            padding: 25px;
+            border-radius: 32px;
+            text-align: center;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.3);
+            max-width: 350px;
+            width: 90%;
+            border: 6px solid var(--primary);
+        }
+
+        input {
+            width: 85%;
+            padding: 12px;
+            border-radius: 15px;
+            border: 3px solid var(--dark);
+            margin: 10px 0;
+            font-family: 'Lexend', sans-serif;
+            font-weight: 700;
+            text-align: center;
+            outline: none;
+        }
+
+        .btn {
+            background: var(--primary);
+            color: white;
+            border: 3px solid var(--dark);
+            padding: 14px 25px;
+            border-radius: 20px;
+            font-size: 1.1rem;
+            cursor: pointer;
+            font-weight: 900;
+            width: 100%;
+            margin-top: 10px;
+            box-shadow: 0 6px 0px var(--dark);
+            transition: all 0.1s;
+            font-family: 'Lexend', sans-serif;
+        }
+
+        .btn:active { transform: translateY(4px); box-shadow: 0 2px 0px var(--dark); }
+        .hidden { display: none !important; }
+        
+        #leaderboard-list {
+            margin-top: 10px;
+            max-height: 200px;
+            overflow-y: auto;
+            text-align: left;
+            padding-right: 5px;
+        }
+
+        .rank-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 6px 10px;
+            border-bottom: 1px solid #eee;
+            font-weight: 700;
+            font-size: 0.85rem;
+        }
+
+        .rank-item.highlight {
+            background-color: #fef08a;
+            border-radius: 8px;
+            color: #854d0e;
+        }
+
+        .shake { animation: shake 0.4s cubic-bezier(.36,.07,.19,.97) both; }
+        @keyframes shake {
+            10%, 90% { transform: translate3d(-2px, 0, 0); }
+            20%, 80% { transform: translate3d(4px, 0, 0); }
+            30%, 50%, 70% { transform: translate3d(-6px, 0, 0); }
+            40%, 60% { transform: translate3d(6px, 0, 0); }
+        }
+    </style>
+</head>
+<body>
+    <div id="hud">
+        <div class="hud-item">⭐ <span id="score">0</span></div>
+        <div class="hud-item" id="combo-display">🔥 x1</div>
+        <div class="hud-item">❤️ <span id="lives">3</span></div>
+        <div class="hud-item">⌛ <span id="time">30</span>s</div>
+    </div>
+
+    <!-- Màn hình bắt đầu -->
+    <div id="start-screen" class="overlay">
+        <div class="card">
+            <h1 style="color:var(--dark); margin:0 0 5px; font-size: 1.6rem; font-weight: 900;">ĐÀO TRỨNG VÀNG</h1>
+            <p style="color:#666; font-size: 0.85rem; margin-bottom: 10px;">Thử thách 30 giây leo Top BXH!</p>
+            <input type="text" id="player-name" placeholder="Nhập tên của bạn..." maxlength="12">
+            <button class="btn" id="start-btn-action">BẮT ĐẦU CHƠI</button>
+        </div>
+    </div>
+
+    <!-- Màn hình kết thúc -->
+    <div id="game-over" class="overlay hidden">
+        <div class="card">
+            <h1 id="over-title" style="color:var(--dark); margin:0; font-size: 1.5rem; font-weight: 900;">KẾT THÚC!</h1>
+            <div id="final-score-container" style="margin: 10px 0;">
+                <span style="font-size: 1rem; color: #666;">Điểm của bạn:</span>
+                <div id="final-score" style="font-size: 2.5rem; font-weight: 900; color: var(--primary);">0</div>
+            </div>
+            
+            <div style="background: #f8fafc; border-radius: 15px; padding: 10px; border: 2px solid #ddd; margin-bottom: 10px;">
+                <div style="font-weight: 900; font-size: 0.8rem; color: #475569; text-transform: uppercase; margin-bottom: 5px;">Bảng Xếp Hạng (Local)</div>
+                <div id="leaderboard-list"></div>
+            </div>
+
+            <button class="btn" id="retry-btn-action">CHƠI LẠI</button>
+        </div>
+    </div>
+
+    <canvas id="gameCanvas"></canvas>
+
+<script>
+// --- CONFIG & STATE ---
+const CONFIG = { 
+    hookY: 130, 
+    groundY: 145, 
+    minAngle: 0.15, 
+    maxAngle: Math.PI - 0.15, 
+    extendSpeed: 18, 
+    baseRetractSpeed: 12,
+    localKey: 'gold_miner_leaderboard_v2'
+};
+
+let canvas, ctx, scoreEl, livesEl, timeEl, comboEl, startScreen, gameOverEl, finalScoreEl, leaderboardList, nameInput;
+let playerName = "Vô danh";
+let width, height, score, timeLeft, gameActive = false, timerInterval, lives;
+let comboCount = 0;
+let lastGameId = null;
+const items = [], particles = [], clouds = [], notices = [];
+
+// Unicode-safe Base64 helper cho SVG
+const svgToDataUri = (svg) => `data:image/svg+xml;base64,${btoa(unescape(encodeURIComponent(svg)))}`;
+
+const svgData = {
+    GOLD: `<svg width="100" height="100" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><ellipse cx="50" cy="55" rx="44" ry="48" fill="#FFD93D" stroke="#2B2D42" stroke-width="5"/><circle cx="35" cy="55" r="6" fill="#2B2D42"/><circle cx="65" cy="55" r="6" fill="#2B2D42"/><path d="M 40 72 Q 50 82 60 72" stroke="#2B2D42" stroke-width="5" fill="none" stroke-linecap="round"/></svg>`,
+    SUPER_GOLD: `<svg width="100" height="100" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><ellipse cx="50" cy="55" rx="44" ry="48" fill="#FFD700" stroke="#2B2D42" stroke-width="6"/><path d="M30 30 L50 10 L70 30 L60 25 L50 30 L40 25 Z" fill="#FFD93D" stroke="#2B2D42" stroke-width="3" /><circle cx="50" cy="10" r="5" fill="#FF477E"/><circle cx="35" cy="55" r="7" fill="#2B2D42"/><circle cx="65" cy="55" r="7" fill="#2B2D42"/><path d="M 40 72 Q 50 85 60 72" stroke="#2B2D42" stroke-width="6" fill="none" stroke-linecap="round"/></svg>`,
+    PINK: `<svg width="100" height="100" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><ellipse cx="50" cy="55" rx="40" ry="46" fill="#FFADAD" stroke="#2B2D42" stroke-width="5"/><circle cx="38" cy="55" r="5" fill="#2B2D42"/><circle cx="62" cy="55" r="5" fill="#2B2D42"/></svg>`,
+    STRIPED: `<svg width="100" height="100" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><ellipse cx="50" cy="55" rx="45" ry="48" fill="#FFCC80" stroke="#2B2D42" stroke-width="5"/><path d="M20 40 Q50 30 80 40 M20 60 Q50 50 80 60 M20 80 Q50 70 80 80" stroke="#FB8C00" stroke-width="5" fill="none" opacity="0.6"/><circle cx="35" cy="55" r="5" fill="#2B2D42"/><circle cx="65" cy="55" r="5" fill="#2B2D42"/></svg>`,
+    DOTS: `<svg width="100" height="100" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><ellipse cx="50" cy="55" rx="42" ry="46" fill="#F8BBD0" stroke="#2B2D42" stroke-width="5"/><circle cx="30" cy="40" r="6" fill="#F06292"/><circle cx="70" cy="50" r="5" fill="#F06292"/><circle cx="35" cy="55" r="5" fill="#2B2D42"/><circle cx="65" cy="55" r="5" fill="#2B2D42"/></svg>`,
+    BASKET: `<svg width="100" height="100" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><path d="M15 45 Q50 25 85 45 L80 85 Q50 95 20 85 Z" fill="#D4A373" stroke="#2B2D42" stroke-width="5"/><circle cx="40" cy="40" r="8" fill="#FFB7B2"/><circle cx="60" cy="40" r="8" fill="#9BF6FF"/><circle cx="50" cy="30" r="10" fill="#FFD93D" stroke="#2B2D42" stroke-width="2"/></svg>`,
+    ROTTEN_EGG: `<svg width="100" height="100" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><ellipse cx="50" cy="55" rx="40" ry="46" fill="#78350f" stroke="#2B2D42" stroke-width="6"/><circle cx="35" cy="45" r="8" fill="#84cc16" opacity="0.6"/><path d="M 40 75 Q 50 65 60 75" stroke="#2B2D42" stroke-width="4" fill="none" stroke-linecap="round"/><text x="32" y="65" font-size="22">🤢</text></svg>`,
+    TNT: `<svg width="100" height="100" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><circle cx="50" cy="55" r="38" fill="#333" stroke="#000" stroke-width="4"/><text x="50" y="62" font-family="Arial Black" font-size="14" text-anchor="middle" fill="#FF4D4D">BOOM</text></svg>`,
+    CRAB: `<svg width="100" height="100" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+        <path d="M15 65 Q5 45 15 25 M85 65 Q95 45 85 25" stroke="#E63946" stroke-width="8" fill="none"/>
+        <ellipse cx="50" cy="50" rx="35" ry="25" fill="#E63946" stroke="#2B2D42" stroke-width="4"/>
+        <circle cx="40" cy="45" r="4" fill="#FFFFFF"/><circle cx="60" cy="45" r="4" fill="#FFFFFF"/><circle cx="40" cy="45" r="2" fill="#000"/><circle cx="60" cy="45" r="2" fill="#000"/>
+        <ellipse cx="50" cy="25" rx="20" ry="18" fill="#FFD93D" stroke="#2B2D42" stroke-width="3"/>
+    </svg>`,
+    MINER: `<svg width="120" height="120" viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg"><rect x="30" y="30" width="60" height="65" rx="18" fill="#E5989B" stroke="#2B2D42" stroke-width="5"/><circle cx="45" cy="55" r="4" fill="#1A1C2C"/><circle cx="75" cy="55" r="4" fill="#1A1C2C"/><rect x="40" y="15" width="40" height="15" rx="7" fill="#FFD93D" stroke="#2B2D42" stroke-width="3"/></svg>`,
+    CLOUD: `<svg width="100" height="60" viewBox="0 0 100 60" xmlns="http://www.w3.org/2000/svg"><path d="M10,45 Q10,30 25,30 Q30,10 55,10 Q75,10 80,30 Q95,30 95,45 Z" fill="white" opacity="0.8"/></svg>`
+};
+
+const imgs = {};
+Object.entries(svgData).forEach(([k, v]) => { imgs[k] = new Image(); imgs[k].src = svgToDataUri(v); });
+
+const itemConfigs = {
+    SUPER_GOLD: { type: 'SUPER_GOLD', size: 48, points: 500, weight: 2.8, label: 'SIÊU CẤP ✨' },
+    CRAB: { type: 'CRAB', size: 38, points: 500, weight: 2.0, label: 'CUA SIÊU CẤP 🦀', isMoving: true }, // Điểm cao bằng SUPER_GOLD
+    STRIPED: { type: 'STRIPED', size: 44, points: 300, weight: 2.4, label: 'TRỨNG VẰN' },
+    DOTS: { type: 'DOTS', size: 40, points: 200, weight: 2.1, label: 'TRỨNG CHẤM' },
+    GOLD: { type: 'GOLD', size: 33, points: 100, weight: 1.5, label: 'TRỨNG VÀNG' },
+    PINK: { type: 'PINK', size: 30, points: 70, weight: 1.3, label: 'TRỨNG HỒNG' },
+    BASKET: { type: 'BASKET', size: 42, points: 'RANDOM', weight: 2.2, isBasket: true, label: 'QUÀ 🎁' },
+    ROTTEN_EGG: { type: 'ROTTEN_EGG', size: 30, points: -50, weight: 1.4, isPenalty: true, label: 'THỐI 🤢' },
+    TNT:  { type: 'TNT', size: 35, points: -100, weight: 1.0, isBomb: true, label: 'BOOM!' }
+};
+
+let hook = { x: 0, y: CONFIG.hookY, angle: Math.PI / 2, speed: 0.055, length: 50, state: 'swinging', grabbedItem: null };
+
+// --- ÂM THANH ---
+let audioCtx;
+function initAudio() { if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)(); }
+function playSound(type) {
+    if (!audioCtx || audioCtx.state === 'suspended') return;
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.connect(gain); gain.connect(audioCtx.destination);
+    const now = audioCtx.currentTime;
+    switch(type) {
+        case 'tick':
+            osc.type = 'square'; osc.frequency.setValueAtTime(800, now);
+            gain.gain.setValueAtTime(0.015, now); gain.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
+            osc.start(now); osc.stop(now + 0.05); break;
+        case 'collect':
+            osc.type = 'triangle'; osc.frequency.setValueAtTime(600, now); osc.frequency.exponentialRampToValueAtTime(1200, now + 0.1);
+            gain.gain.setValueAtTime(0.15, now); gain.gain.exponentialRampToValueAtTime(0.01, now + 0.2);
+            osc.start(now); osc.stop(now + 0.2); break;
+        case 'boom':
+            osc.type = 'sawtooth'; osc.frequency.setValueAtTime(120, now); osc.frequency.exponentialRampToValueAtTime(40, now + 0.4);
+            gain.gain.setValueAtTime(0.3, now); gain.gain.linearRampToValueAtTime(0, now + 0.4);
+            osc.start(now); osc.stop(now + 0.4); break;
+        case 'fail':
+            osc.type = 'sawtooth'; osc.frequency.setValueAtTime(100, now); gain.gain.setValueAtTime(0.1, now);
+            gain.gain.linearRampToValueAtTime(0, now + 0.3); osc.start(now); osc.stop(now + 0.3); break;
+    }
+}
+
+// --- LOGIC GIAO DIỆN & GAME ---
+function updateHUD() {
+    if (scoreEl) scoreEl.innerText = score;
+    if (livesEl) livesEl.innerText = lives;
+    if (timeEl) timeEl.innerText = timeLeft;
+    if (comboEl) comboEl.innerText = `🔥 x${Math.max(1, Math.floor(comboCount / 2) + 1)}`;
+}
+
+function bindUI() {
+    canvas = document.getElementById('gameCanvas');
+    ctx = canvas ? canvas.getContext('2d') : null;
+    scoreEl = document.getElementById('score');
+    livesEl = document.getElementById('lives');
+    timeEl = document.getElementById('time');
+    comboEl = document.getElementById('combo-display');
+    startScreen = document.getElementById('start-screen');
+    gameOverEl = document.getElementById('game-over');
+    finalScoreEl = document.getElementById('final-score');
+    leaderboardList = document.getElementById('leaderboard-list');
+    nameInput = document.getElementById('player-name');
+
+    document.getElementById('start-btn-action')?.addEventListener('click', startGame);
+    document.getElementById('retry-btn-action')?.addEventListener('click', showStartScreen);
+}
+
+function renderLeaderboard() {
+    if (!leaderboardList) return;
+    const data = JSON.parse(localStorage.getItem(CONFIG.localKey) || "[]");
+    leaderboardList.innerHTML = '';
+    if (data.length === 0) {
+        leaderboardList.innerHTML = '<div style="text-align:center; padding:10px; font-size:0.75rem;">Chưa có kỷ lục.</div>';
+        return;
+    }
+    data.forEach((entry, index) => {
+        const item = document.createElement('div');
+        item.className = 'rank-item';
+        if (lastGameId && entry.id === lastGameId) item.classList.add('highlight');
+        item.innerHTML = `<span>${index + 1}. ${entry.name}</span> <span>${entry.score}</span>`;
+        leaderboardList.appendChild(item);
+    });
+}
+
+function saveLocalScore(name, score) {
+    const gameId = Date.now();
+    lastGameId = gameId;
+    let data = JSON.parse(localStorage.getItem(CONFIG.localKey) || "[]");
+    data.push({ id: gameId, name, score, date: gameId });
+    data.sort((a, b) => b.score - a.score);
+    data = data.slice(0, 10);
+    localStorage.setItem(CONFIG.localKey, JSON.stringify(data));
+}
+
+function resize() {
+    if (!canvas) return;
+    const dpr = window.devicePixelRatio || 1;
+    width = window.innerWidth; height = window.innerHeight;
+    canvas.width = width * dpr; canvas.height = height * dpr;
+    canvas.style.width = width + 'px'; canvas.style.height = height + 'px';
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    hook.x = width / 2;
+    clouds.length = 0;
+    for(let i=0; i<4; i++) clouds.push({ x: Math.random() * width, y: 20 + Math.random() * 60, speed: 0.2 + Math.random() * 0.4, scale: 0.7 + Math.random() * 0.5 });
+}
+
+function spawnItems() {
+    items.length = 0;
+    const types = Object.keys(itemConfigs);
+    while(items.length < 22) {
+        const key = types[Math.floor(Math.random() * types.length)];
+        const config = itemConfigs[key];
+        const newItem = { 
+            x: 60 + Math.random() * (width - 120), 
+            y: CONFIG.groundY + 110 + Math.random() * (height - CONFIG.groundY - 180), 
+            ...config, 
+            active: true, 
+            rot: (Math.random() - 0.5) * 0.5,
+            vx: config.isMoving ? (Math.random() > 0.5 ? 2.5 : -2.5) : 0
+        };
+        if(!items.some(e => Math.hypot(e.x - newItem.x, e.y - newItem.y) < 75)) items.push(newItem);
+    }
+}
+
+function draw() {
+    if (!ctx) return;
+    ctx.clearRect(0, 0, width, height);
+    
+    // Background
+    const sky = ctx.createLinearGradient(0, 0, 0, CONFIG.groundY);
+    sky.addColorStop(0, '#BDE0FE'); sky.addColorStop(1, '#f0fdf4'); 
+    ctx.fillStyle = sky; ctx.fillRect(0, 0, width, CONFIG.groundY);
+    const ground = ctx.createLinearGradient(0, CONFIG.groundY, 0, height);
+    ground.addColorStop(0, '#bbf7d0'); ground.addColorStop(0.3, '#4ade80'); ground.addColorStop(1, '#166534'); 
+    ctx.fillStyle = ground; ctx.fillRect(0, CONFIG.groundY, width, height - CONFIG.groundY);
+
+    clouds.forEach(c => { ctx.drawImage(imgs.CLOUD, c.x, c.y, 100 * c.scale, 60 * c.scale); c.x += 0.2; if(c.x > width) c.x = -150; });
+    ctx.drawImage(imgs.BASKET, hook.x + 55, CONFIG.hookY - 40, 50, 50);
+    ctx.drawImage(imgs.MINER, hook.x - 45, CONFIG.hookY - 60, 90, 90);
+
+    items.forEach(item => {
+        if(!item.active) return;
+        ctx.save(); ctx.translate(Math.round(item.x), Math.round(item.y)); 
+        if(item.isMoving && item.vx < 0) ctx.scale(-1, 1);
+        ctx.rotate(item.rot);
+        ctx.drawImage(imgs[item.type], -item.size, -item.size, item.size * 2, item.size * 2); 
+        ctx.restore();
+    });
+
+    const ex = hook.x + Math.cos(hook.angle) * hook.length, ey = hook.y + Math.sin(hook.angle) * hook.length;
+    ctx.strokeStyle = '#2B2D42'; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(hook.x, hook.y); ctx.lineTo(ex, ey); ctx.stroke();
+    ctx.save(); ctx.translate(ex, ey); ctx.rotate(hook.angle + Math.PI/2);
+    ctx.strokeStyle = '#111'; ctx.lineWidth = 6; ctx.beginPath(); ctx.arc(0, 0, 18, 0.5, Math.PI - 0.5); ctx.stroke();
+    ctx.restore();
+
+    if(hook.grabbedItem) {
+        ctx.save(); ctx.translate(Math.round(ex), Math.round(ey + 22)); ctx.rotate(hook.grabbedItem.rot);
+        ctx.drawImage(imgs[hook.grabbedItem.type], -hook.grabbedItem.size, -hook.grabbedItem.size, hook.grabbedItem.size*2, hook.grabbedItem.size*2);
+        ctx.restore();
+    }
+
+    // Notices & Particles
+    for (let i = notices.length - 1; i >= 0; i--) {
+        const n = notices[i]; n.y -= 1.5; n.life -= 0.02;
+        if(n.life <= 0) { notices.splice(i, 1); continue; }
+        ctx.save(); ctx.globalAlpha = n.life; ctx.fillStyle = n.color; ctx.font = 'bold 24px Lexend'; ctx.textAlign = 'center'; ctx.fillText(n.text, n.x, n.y); ctx.restore();
+    }
+    for (let i = particles.length - 1; i >= 0; i--) {
+        const p = particles[i]; p.x += p.vx; p.y += p.vy; p.life -= 0.05;
+        if(p.life <= 0) { particles.splice(i, 1); continue; }
+        ctx.save(); ctx.globalAlpha = p.life; ctx.fillStyle = p.color; ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, 6.28); ctx.fill(); ctx.restore();
+    }
+
+    update();
+    requestAnimationFrame(draw);
+}
+
+function update() {
+    if(!gameActive) return;
+
+    items.forEach(item => {
+        if(item.active && item.isMoving) {
+            item.x += item.vx;
+            if(item.x < 50 || item.x > width - 50) item.vx *= -1;
+        }
+    });
+
+    if(hook.state === 'swinging') {
+        hook.angle += hook.speed; if(hook.angle > CONFIG.maxAngle || hook.angle < CONFIG.minAngle) hook.speed *= -1;
+    } 
+    else if(hook.state === 'extending') {
+        hook.length += CONFIG.extendSpeed;
+        const ex = hook.x + Math.cos(hook.angle) * hook.length, ey = hook.y + Math.sin(hook.angle) * hook.length;
+        if(ex < 0 || ex > width || ey > height) {
+            hook.state = 'retracting';
+            comboCount = 0; updateHUD();
+        }
+        for(let item of items) {
+            if(item.active && Math.hypot(ex - item.x, ey - item.y) < item.size) {
+                item.active = false;
+                if(item.isBomb) {
+                    score = Math.max(0, score + item.points); lives--; updateHUD();
+                    playSound('boom'); notices.push({text: item.label, x: item.x, y: item.y, color: '#E63946', life: 1});
+                    for(let i=0; i<15; i++) particles.push({ x: item.x, y: item.y, life: 1, color: '#FF4D4D', vx: (Math.random()-0.5)*15, vy: (Math.random()-0.5)*15, size: 3+Math.random()*5 });
+                    document.body.classList.add('shake'); setTimeout(() => document.body.classList.remove('shake'), 400);
+                    hook.state = 'retracting'; comboCount = 0;
+                    if(lives <= 0) triggerGameOver("HẾT MẠNG!");
+                } else { hook.grabbedItem = item; hook.state = 'retracting'; }
+                break;
+            }
+        }
+    } 
+    else if(hook.state === 'retracting') {
+        let speed = hook.grabbedItem ? CONFIG.baseRetractSpeed / hook.grabbedItem.weight : CONFIG.baseRetractSpeed + 15;
+        hook.length -= speed;
+        if(Math.floor(hook.length) % 12 === 0) playSound('tick');
+
+        if(hook.length <= 50) {
+            if(hook.grabbedItem) {
+                let baseP = hook.grabbedItem.points === 'RANDOM' ? Math.floor(Math.random() * 301) + 200 : hook.grabbedItem.points;
+                if(hook.grabbedItem.isPenalty) { 
+                    lives--; updateHUD(); playSound('fail'); notices.push({text: "-1 ❤️", x: hook.x, y: hook.y + 100, color: '#5D4037', life: 1});
+                    comboCount = 0;
+                } else { 
+                    comboCount++;
+                    let multiplier = Math.max(1, Math.floor(comboCount / 2) + 1);
+                    let finalP = baseP * multiplier;
+                    playSound('collect'); 
+                    notices.push({text: `+${finalP} ${multiplier > 1 ? '(x' + multiplier + ')' : ''}`, x: hook.x, y: hook.y + 100, color: multiplier > 1 ? '#E11D48' : '#166534', life: 1});
+                    score += finalP;
+                }
+                updateHUD();
+                for(let i=0; i<10; i++) particles.push({ x: hook.x, y: hook.y + 35, life: 1, color: baseP < 0 ? '#84cc16' : '#FFD93D', vx: (Math.random()-0.5)*15, vy: (Math.random()-0.5)*15, size: 2+Math.random()*4 });
+                hook.grabbedItem = null;
+                if(lives <= 0) triggerGameOver("HẾT MẠNG!");
+            }
+            hook.length = 50; hook.state = 'swinging';
+            if(items.filter(i => i.active && !i.isBomb && !i.isPenalty).length < 5) spawnItems();
+        }
+    }
+}
+
+function triggerGameOver(reason) {
+    gameActive = false;
+    document.getElementById('over-title').innerText = reason;
+    finalScoreEl.innerText = score;
+    saveLocalScore(playerName, score);
+    renderLeaderboard();
+    gameOverEl.classList.remove('hidden');
+    if(timerInterval) clearInterval(timerInterval);
+}
+
+function startGame() {
+    if (!nameInput) bindUI();
+    const name = nameInput.value.trim();
+    if (!name) { 
+        nameInput.style.borderColor = 'var(--danger)'; 
+        nameInput.placeholder = "Vui lòng nhập tên!";
+        return; 
+    }
+    nameInput.style.borderColor = 'var(--dark)';
+    playerName = name;
+    
+    initAudio(); if(audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+    
+    score = 0; timeLeft = 30; lives = 3; comboCount = 0;
+    hook.length = 50; hook.state = 'swinging'; hook.grabbedItem = null;
+    particles.length = 0; notices.length = 0; 
+    
+    spawnItems(); updateHUD(); 
+    gameActive = true;
+    startScreen.classList.add('hidden'); 
+    gameOverEl.classList.add('hidden');
+    
+    if(timerInterval) clearInterval(timerInterval);
+    timerInterval = setInterval(() => { 
+        if(!gameActive) return; 
+        timeLeft--; 
+        if (timeEl) timeEl.innerText = timeLeft; 
+        if(timeLeft <= 0) triggerGameOver("HẾT GIỜ!"); 
+    }, 1000);
+}
+
+function showStartScreen() { 
+    startScreen.classList.remove('hidden'); 
+    gameOverEl.classList.add('hidden'); 
+}
+
+window.onload = () => { 
+    bindUI();
+    resize(); 
+    draw();
+};
+
+window.onresize = resize;
+window.onpointerdown = (e) => { 
+    if(gameActive && hook.state === 'swinging' && !e.target.closest('.card') && !e.target.closest('input')) {
+        initAudio(); if(audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+        hook.state = 'extending';
+    }
+};
+
+window.startGame = startGame;
+window.showStartScreen = showStartScreen;
+</script>
+</body>
+</html>
