@@ -91,7 +91,7 @@ function setLevel(l){level=l;deck=[];LV=LEVELS[l];try{localStorage.setItem('egg_
 let VOICE=null;
 function pickVoice(){try{const vs=speechSynthesis.getVoices().filter(v=>/^en[-_]/i.test(v.lang));VOICE=vs.find(v=>/(natural|jenny|aria|samantha|google us english|zira|ava|allison|karen|serena)/i.test(v.name))||vs.find(v=>/en[-_]US/i.test(v.lang))||vs[0]||null}catch(e){}}
 try{speechSynthesis.onvoiceschanged=pickVoice;pickVoice()}catch(e){}
-function speak(t,warm=true){try{const u=new SpeechSynthesisUtterance(warm?t+'!':t);if(VOICE)u.voice=VOICE;u.lang=VOICE?VOICE.lang:'en-US';u.rate=warm?.88:.92;u.pitch=warm?1.18:1.02;u.volume=1;speechSynthesis.cancel();speechSynthesis.speak(u)}catch(e){}}
+function speak(t,warm=true){try{const u=new SpeechSynthesisUtterance(warm?t+'!':t);if(VOICE)u.voice=VOICE;u.lang=VOICE?VOICE.lang:'en-US';u.rate=warm?.98:.88;u.pitch=warm?1.4:.95;u.volume=1;speechSynthesis.cancel();speechSynthesis.speak(u)}catch(e){}}
 
 // ---- SVG nâng cấp (gradient, bóng, má hồng, highlight)
 const svgToDataUri=s=>`data:image/svg+xml;base64,${btoa(unescape(encodeURIComponent(s)))}`;
@@ -261,10 +261,10 @@ function draw(){
  });
 
  const ex=hook.x+Math.cos(hook.angle)*hook.length,ey=hook.y+Math.sin(hook.angle)*hook.length;
- if(level==='easy'&&gameActive&&hook.state==='swinging'){const c=Math.cos(hook.angle),sn=Math.sin(hook.angle);
+ if(gameActive&&hook.state==='swinging'){const c=Math.cos(hook.angle),sn=Math.sin(hook.angle);
   const L=Math.min(520,c>1e-3?(width-10-hook.x)/c:c<-1e-3?(hook.x-10)/-c:1e9,(height-10-hook.y)/sn);
   if(L>110){const x2=hook.x+c*L,y2=hook.y+sn*L;ctx.save();ctx.shadowColor='rgba(43,45,66,.55)';ctx.shadowBlur=5;
-   ctx.strokeStyle='rgba(255,255,255,.95)';ctx.fillStyle='#fff';ctx.lineWidth=5;ctx.lineCap='round';ctx.setLineDash([4,12]);ctx.lineDashOffset=-Date.now()/30;
+   ctx.strokeStyle='rgba(255,255,255,.95)';ctx.fillStyle='#fff';ctx.lineWidth=8;ctx.lineCap='round';ctx.setLineDash([0,22]);ctx.lineDashOffset=-Date.now()/40;
    ctx.beginPath();ctx.moveTo(hook.x+c*70,hook.y+sn*70);ctx.lineTo(x2,y2);ctx.stroke();ctx.setLineDash([]);
    ctx.translate(x2,y2);ctx.rotate(hook.angle);ctx.beginPath();ctx.moveTo(16,0);ctx.lineTo(-8,-13);ctx.lineTo(-8,13);ctx.closePath();ctx.fill();ctx.restore()}}
  ctx.strokeStyle=D;ctx.lineWidth=4;ctx.beginPath();ctx.moveTo(hook.x,hook.y);ctx.lineTo(ex,ey);ctx.stroke();
