@@ -30,21 +30,28 @@ input{width:85%;padding:12px;border-radius:15px;border:2px solid #e5d5ff;backgro
 .shake{animation:shake .4s both}
 @keyframes shake{20%,80%{transform:translate3d(4px,0,0)}30%,50%,70%{transform:translate3d(-6px,0,0)}40%,60%{transform:translate3d(6px,0,0)}}
 .lv-row{display:flex;gap:6px;margin:6px 0 2px}.lv{flex:1;border:2px solid #e5d5ff;background:#fff;border-radius:14px;padding:8px 2px;font:700 .78rem 'Lexend',sans-serif;color:var(--dark);cursor:pointer;line-height:1.25}.lv b{display:block;font-size:1.2rem}.lv.on{border-color:#7C5CFC;background:linear-gradient(135deg,#efe7ff,#ffe3ee);box-shadow:0 4px 12px rgba(124,92,252,.3)}#lv-desc{font-size:.72rem;color:#64748b;margin:4px 0 2px;min-height:3em}
+#quit-btn{pointer-events:auto;flex:0 0 36px;width:36px;height:36px;align-self:center;border-radius:50%;border:2px solid rgba(255,255,255,.9);background:rgba(43,45,66,.85);color:#fff;font:900 1rem 'Lexend',sans-serif;line-height:1;cursor:pointer;box-shadow:0 4px 14px rgba(43,45,66,.35);padding:0}
+#quit-btn:active{transform:scale(.92)}
+.sec{font-size:.68rem;font-weight:700;text-transform:uppercase;color:#7c6aa8;margin:8px 0 0;text-align:left;letter-spacing:.04em}
 </style>
 </head>
 <body>
 <div id="hud">
   <div class="hud-item">⭐ <span id="score">0</span></div>
   <div class="hud-item" id="combo-display">🔥 x1</div>
-  <div class="hud-item">❤️ <span id="lives">3</span></div>
-  <div class="hud-item">⌛ <span id="time">30</span>s</div>
+  <div class="hud-item" id="lives-box">❤️ <span id="lives">3</span></div>
+  <div class="hud-item">⌛ <span id="time">30</span><span id="tu">s</span></div>
+  <button id="quit-btn" class="hidden" aria-label="Thoát game" title="Thoát game">✕</button>
 </div>
 <div id="target" class="hidden"><small>Tìm trứng có từ tiếng Anh nghĩa là:</small><b id="target-text"></b></div>
 
 <div id="start-screen" class="overlay"><div class="card">
   <div style="font-size:2.4rem;line-height:1">🥚</div><h1 style="margin:4px 0 6px;font-size:1.6rem;font-weight:900;background:linear-gradient(135deg,#7C5CFC,#FF6FA5);-webkit-background-clip:text;background-clip:text;color:transparent">ĐÀO TRỨNG VÀNG</h1>
-  <p style="color:#666;font-size:.85rem;margin:0 0 6px">Đọc nghĩa tiếng Việt, câu đúng quả trứng có từ tiếng Anh tương ứng! Đúng được thưởng điểm và thêm giây 🔊</p>
+  <p style="color:#666;font-size:.85rem;margin:0 0 6px">Đọc nghĩa tiếng Việt, câu đúng quả trứng có từ tiếng Anh tương ứng! Đúng được thưởng điểm 🔊</p>
+  <div class="sec">Độ khó</div>
   <div class="lv-row"><button class="lv" data-lv="easy"><b>🌱</b>Dễ</button><button class="lv" data-lv="medium"><b>⭐</b>Trung bình</button><button class="lv" data-lv="hard"><b>🔥</b>Khó</button></div><div id="lv-desc"></div>
+  <div class="sec">Chế độ thời gian</div>
+  <div class="lv-row"><button class="lv" data-md="classic"><b>♾️</b>Cổ điển</button><button class="lv" data-md="t30"><b>⚡</b>30 giây</button><button class="lv" data-md="t45"><b>🕐</b>45 giây</button><button class="lv" data-md="t60"><b>⏱️</b>60 giây</button></div><div id="md-desc"></div>
   <input type="text" id="player-name" placeholder="Nhập tên của bạn..." maxlength="12">
   <button class="btn" id="start-btn-action">BẮT ĐẦU CHƠI</button>
 </div></div>
@@ -84,14 +91,52 @@ const LEVELS={
 };
 Object.values(LEVELS).forEach(l=>l.desc=l.desc.replace('§',l.vocab.length+' '));
 let level='medium',LV=LEVELS.medium;
-const lvKey=()=>level==='medium'?CONFIG.localKey:CONFIG.localKey+'_'+level;
+
+// ---- Chế độ thời gian: classic = theo cấp độ (đúng thì cộng giây); t30/t60 = đồng hồ cố định, đua điểm trong 30s/60s
+const MODES={
+ classic:{name:'Cổ điển',desc:'♾️ Không giới hạn thời gian. Mỗi lần câu phải trứng thối hoặc bom mất 1 mạng, đủ 3 lần là thua.'},
+ t30:{name:'30 giây',t:30,desc:'⚡ Đồng hồ cố định 30 giây, không cộng giờ. Hãy kiếm điểm thật nhanh!'},
+ t45:{name:'45 giây',t:45,desc:'🕐 Đồng hồ cố định 45 giây, không cộng giờ. Vừa đủ để chơi thoải mái!'},
+ t60:{name:'60 giây',t:60,desc:'⏱️ Đồng hồ cố định 60 giây, không cộng giờ. Đủ thời gian để lập kỷ lục!'}
+};
+let mode='classic',GT={time:30,cap:45,bonus:3};
+const lvKey=()=>(level==='medium'?CONFIG.localKey:CONFIG.localKey+'_'+level)+(mode==='classic'?'':'_'+mode);
+function lvText(){let d=LV.desc;if(mode==='classic')d=d.replace(/· \d+ mạng · \d+ giây ?/,'').replace(/ · sai bị -3 giây và 0 điểm/,' · sai không được điểm');return d}
 function setLevel(l){level=l;deck=[];LV=LEVELS[l];try{localStorage.setItem('egg_level',l)}catch(e){}
- document.querySelectorAll('.lv').forEach(b=>b.classList.toggle('on',b.dataset.lv===l));
- document.getElementById('lv-desc').textContent=LV.desc}
+ document.querySelectorAll('[data-lv]').forEach(b=>b.classList.toggle('on',b.dataset.lv===l));
+ document.getElementById('lv-desc').textContent=lvText()}
+function setMode(m){mode=m;try{localStorage.setItem('egg_mode',m)}catch(e){}
+ document.querySelectorAll('[data-md]').forEach(b=>b.classList.toggle('on',b.dataset.md===m));
+ document.getElementById('md-desc').textContent=MODES[m].desc;document.getElementById('lv-desc').textContent=lvText()}
+
+// ---- Giọng nói: chọn giọng tự nhiên nhất có sẵn, đọc từ + lời khen với ngữ điệu vui vẻ
 let VOICE=null;
-function pickVoice(){try{const vs=speechSynthesis.getVoices().filter(v=>/^en[-_]/i.test(v.lang));VOICE=vs.find(v=>/(natural|jenny|aria|samantha|google us english|zira|ava|allison|karen|serena)/i.test(v.name))||vs.find(v=>/en[-_]US/i.test(v.lang))||vs[0]||null}catch(e){}}
+function pickVoice(){try{
+ const score=v=>{const n=v.name;let s=0;
+  if(/natural|neural|online/i.test(n))s+=50;
+  if(/premium|enhanced/i.test(n))s+=30;
+  if(/google/i.test(n))s+=25;
+  if(/aria|jenny|ava|emma|samantha|allison|nicky|zoe|karen|serena|joanna|ivy|kendra/i.test(n))s+=20;
+  if(/en[-_]US/i.test(v.lang))s+=10;
+  if(/compact|espeak|novelty|bad news|whisper|zarvox|trinoids/i.test(n))s-=40;
+  return s};
+ const vs=speechSynthesis.getVoices().filter(v=>/^en[-_]/i.test(v.lang));
+ VOICE=vs.sort((a,b)=>score(b)-score(a))[0]||null}catch(e){}}
 try{speechSynthesis.onvoiceschanged=pickVoice;pickVoice()}catch(e){}
-function speak(t,warm=true){try{const u=new SpeechSynthesisUtterance(warm?t+'!':t);if(VOICE)u.voice=VOICE;u.lang=VOICE?VOICE.lang:'en-US';u.rate=warm?.98:.88;u.pitch=warm?1.4:.95;u.volume=1;speechSynthesis.cancel();speechSynthesis.speak(u)}catch(e){}}
+const PRAISE=['Great!','Awesome!','Well done!','Super!','Nice one!','Perfect!','Yay!','Good job!'];
+const PRAISE_COMBO=['Amazing!','Fantastic!',"You're on fire!",'Wow, incredible!','Wonderful!','Brilliant!'];
+const rnd=a=>a[Math.floor(Math.random()*a.length)];
+function utter(txt,rate,pitch){const u=new SpeechSynthesisUtterance(txt);if(VOICE){u.voice=VOICE;u.lang=VOICE.lang}else u.lang='en-US';u.rate=rate;u.pitch=pitch;u.volume=1;speechSynthesis.speak(u)}
+function speak(t,warm=true,combo=0){try{
+ if(!VOICE)pickVoice();
+ speechSynthesis.cancel();
+ const j=()=>Math.random()*.08;
+ if(warm){
+  utter(t+'!',.95+j(),1.18+j());                                   // chỉ đọc từ, giọng vui vẻ
+ }else{
+  utter(t,.88,1)                                                    // sai: đọc chậm, bình tĩnh để nghe lại từ
+ }
+}catch(e){}}
 
 // ---- SVG nâng cấp (gradient, bóng, má hồng, highlight)
 const svgToDataUri=s=>`data:image/svg+xml;base64,${btoa(unescape(encodeURIComponent(s)))}`;
@@ -165,7 +210,7 @@ function playSound(type){
 
 // ---- Giao diện
 function updateHUD(){
- scoreEl.innerText=score;livesEl.innerText=lives;timeEl.innerText=timeLeft;
+ scoreEl.innerText=score;livesEl.innerText=lives;timeEl.innerText=isFinite(timeLeft)?timeLeft:'∞';document.getElementById('tu').style.display=isFinite(timeLeft)?'':'none';
  comboEl.innerText=`🔥 x${Math.max(1,Math.floor(comboCount/2)+1)}`;
 }
 function bindUI(){
@@ -176,13 +221,17 @@ function bindUI(){
  targetEl=document.getElementById('target');targetText=document.getElementById('target-text');
  document.getElementById('start-btn-action').addEventListener('click',startGame);
  document.getElementById('retry-btn-action').addEventListener('click',showStartScreen);
+ document.getElementById('quit-btn').addEventListener('click',quitGame);
  try{level=localStorage.getItem('egg_level')||'medium'}catch(e){}
  if(!LEVELS[level])level='medium';
- document.querySelectorAll('.lv').forEach(b=>b.addEventListener('click',()=>setLevel(b.dataset.lv)));setLevel(level);
+ try{mode=localStorage.getItem('egg_mode')||'classic'}catch(e){}
+ if(!MODES[mode])mode='classic';
+ document.querySelectorAll('[data-lv]').forEach(b=>b.addEventListener('click',()=>setLevel(b.dataset.lv)));setLevel(level);
+ document.querySelectorAll('[data-md]').forEach(b=>b.addEventListener('click',()=>setMode(b.dataset.md)));setMode(mode);
 }
 function safeGet(){try{return JSON.parse(localStorage.getItem(lvKey())||'[]')}catch(e){return[]}}
 function renderLeaderboard(){
- const data=safeGet();leaderboardList.innerHTML='';document.getElementById('lb-title').textContent='Bảng xếp hạng · '+LV.name;
+ const data=safeGet();leaderboardList.innerHTML='';document.getElementById('lb-title').textContent='Bảng xếp hạng · '+LV.name+(mode==='classic'?'':' · '+MODES[mode].name);
  if(!data.length){leaderboardList.innerHTML='<div style="text-align:center;padding:8px;font-size:.75rem">Chưa có kỷ lục.</div>';return}
  data.forEach((e,i)=>{const d=document.createElement('div');d.className='rank-item'+(lastGameId&&e.id===lastGameId?' highlight':'');
   const a=document.createElement('span'),b=document.createElement('span');a.textContent=`${i+1}. ${e.name}`;b.textContent=e.score;d.append(a,b);leaderboardList.appendChild(d)});
@@ -220,17 +269,27 @@ function spawnItems(){
  if(deck.length<9)deck=[...LV.vocab].filter(v=>!deck.includes(v)).sort(()=>Math.random()-.5).concat(deck);const pool=deck;let tries=0;
  const cols=width>600?4:3,rows=Math.ceil(12/cols),gx=60,gw=width-120,gy=CONFIG.groundY+95,gh=Math.max(120,height-80-gy),cells=[];
  for(let r=0;r<rows;r++)for(let c=0;c<cols;c++)cells.push([r,c]);cells.sort(()=>Math.random()-.5);
- const eggT=types.filter(t=>itemConfigs[t].egg);let othT=types.filter(t=>!itemConfigs[t].egg);if(LV.noBomb)othT=othT.filter(t=>t!=='TNT');if(LV.badBoost)othT=othT.concat(['TNT','ROTTEN_EGG']);let eggN=0;
+ const noBomb=false;
+ const eggT=types.filter(t=>itemConfigs[t].egg);let othT=types.filter(t=>!itemConfigs[t].egg);if(noBomb)othT=othT.filter(t=>t!=='TNT');if(LV.badBoost)othT=othT.concat(['TNT','ROTTEN_EGG']);let eggN=0;
+ const forced=noBomb?['ROTTEN_EGG']:['TNT','ROTTEN_EGG'];
  while(items.length<12&&tries++<800){
-  const L=eggN<LV.eggs?eggT:othT;const cfg=itemConfigs[L[Math.floor(Math.random()*L.length)]];
+  const L=(forced.length||eggN>=LV.eggs)?othT:eggT;const key=(L===othT&&forced.length)?forced[0]:L[Math.floor(Math.random()*L.length)];const cfg=itemConfigs[key];
   const it={x:gx+(cells[items.length][1]+Math.random())*gw/cols,y:gy+(cells[items.length][0]+Math.random())*gh/rows,...cfg,active:true,rot:(Math.random()-.5)*.5,vx:cfg.isMoving?(Math.random()>.5?LV.crab:-LV.crab):0,vy:0};
   if(items.some(e=>Math.hypot(e.x-it.x,e.y-it.y)<85))continue;
+  if(L===othT&&forced[0]===key)forced.shift();
   if(cfg.egg){const v=pool.pop();[it.word,it.vi,it.emoji]=v;eggN++;if(LV.eggMove&&Math.random()<.5){it.isMoving=true;it.vx=Math.random()>.5?LV.eggMove:-LV.eggMove}}
   it.homeY=it.y;items.push(it);
  }
  pickTarget();
 }
 
+function ensureBomb(){
+ if(items.some(i=>i.active&&i.type==='TNT'))return;
+ const cfg=itemConfigs.TNT,gx=60,gw=width-120,gy=CONFIG.groundY+95,gh=Math.max(120,height-80-gy);
+ for(let t=0;t<60;t++){const x=gx+Math.random()*gw,y=gy+Math.random()*gh;
+  if(items.some(e=>e.active&&Math.hypot(e.x-x,e.y-y)<85))continue;
+  items.push({x,y,...cfg,active:true,rot:(Math.random()-.5)*.5,vx:0,vy:0,homeY:y});return}
+}
 function pill(item){
  ctx.font='800 12px Lexend, Arial';const w=ctx.measureText(item.word).width+14,px=item.x-w/2,py=item.y+item.size*.8;
  ctx.fillStyle='#fff';ctx.strokeStyle=D;ctx.lineWidth=2;ctx.beginPath();ctx.roundRect(px,py,w,18,9);ctx.fill();ctx.stroke();
@@ -305,7 +364,7 @@ function update(){
    if(it.active&&Math.hypot(ex-it.x,ey-it.y)<it.size){
     it.active=false;
     if(it.isBomb){
-     score=Math.max(0,score+it.points);lives--;updateHUD();playSound('boom');note(it.label,it.x,it.y,'#E63946');burst(it.x,it.y,'#FF4D4D',15);
+     score=Math.max(0,score+it.points);if(mode==='classic')lives--;updateHUD();playSound('boom');note(mode==='classic'?it.label:`${it.label} ${it.points}`,it.x,it.y,'#E63946');burst(it.x,it.y,'#FF4D4D',15);
      document.body.classList.add('shake');setTimeout(()=>document.body.classList.remove('shake'),400);
      hook.state='retracting';comboCount=0;if(lives<=0)triggerGameOver('HẾT MẠNG!');
     }else{hook.grabbedItem=it;hook.state='retracting'}
@@ -319,20 +378,20 @@ function update(){
    const g=hook.grabbedItem;
    if(g){
     const baseP=g.points==='RANDOM'?Math.floor(Math.random()*301)+200:g.points,mx=hook.x,my=hook.y+100;
-    if(g.isPenalty){lives--;playSound('fail');note('-1 ❤️',mx,my,'#5D4037');comboCount=0;burst(mx,hook.y+35,'#84cc16')}
+    if(g.isPenalty){if(mode==='classic'){lives--;note('-1 ❤️',mx,my,'#5D4037')}else{score=Math.max(0,score+g.points);note(`${g.points}`,mx,my,'#5D4037')}playSound('fail');comboCount=0;burst(mx,hook.y+35,'#84cc16')}
     else if(g.word&&target&&g.word!==target.word){
      missed.set(g.word,g.vi);if(LV.wrongCombo)comboCount=0;playSound('wrong');speak(g.word,false);
-     const p=Math.floor(baseP*LV.wrongPts);score+=p;note(`${g.word} = ${g.vi} ✗`,mx,my,'#E11D48');note(`+${p}`,mx,my+26,'#64748b');if(LV.wrongTime){timeLeft=Math.max(0,timeLeft-LV.wrongTime);note(`-${LV.wrongTime}s ⌛`,mx,my+52,'#E11D48');if(timeLeft<=0){updateHUD();triggerGameOver('HẾT GIỜ!');return}}
+     const p=Math.floor(baseP*LV.wrongPts);score+=p;note(`${g.word} = ${g.vi} ✗`,mx,my,'#E11D48');note(`+${p}`,mx,my+26,'#64748b');if(LV.wrongTime&&mode!=='classic'){timeLeft=Math.max(0,timeLeft-LV.wrongTime);note(`-${LV.wrongTime}s ⌛`,mx,my+52,'#E11D48');if(timeLeft<=0){updateHUD();triggerGameOver('HẾT GIỜ!');return}}
     }else{
      comboCount++;const mul=Math.max(1,Math.floor(comboCount/2)+1);let p=baseP*mul;
-     if(g.word){p+=150;learned.set(g.word,g.vi);missed.delete(g.word);timeLeft=Math.min(LV.cap,timeLeft+LV.bonus);speak(g.word);
-      note(`✓ ${g.word}! +${LV.bonus}s`,mx,my-26,'#0ea5e9');target=null}
+     if(g.word){p+=150;learned.set(g.word,g.vi);missed.delete(g.word);timeLeft=Math.min(GT.cap,timeLeft+GT.bonus);speak(g.word,true,comboCount);
+      note(`✓ ${g.word}!${GT.bonus?' +'+GT.bonus+'s':''}`,mx,my-26,'#0ea5e9');target=null}
      playSound('collect');score+=p;note(`+${p}${mul>1?' (x'+mul+')':''}`,mx,my,mul>1?'#E11D48':'#166534');burst(mx,hook.y+35,'#FFD93D');
     }
     updateHUD();hook.grabbedItem=null;if(lives<=0)triggerGameOver('HẾT MẠNG!');
    }
    hook.length=50;hook.state='swinging';
-   if(gameActive){if(items.filter(i=>i.active&&i.word).length<3)spawnItems();else ensureTarget()}
+   if(gameActive){if(items.filter(i=>i.active&&i.word).length<3)spawnItems();else{ensureTarget();ensureBomb()}}
   }
  }
 }
@@ -341,26 +400,37 @@ function triggerGameOver(reason){
  if(!gameActive)return;gameActive=false;
  document.getElementById('over-title').innerText=reason;finalScoreEl.innerText=score;
  saveLocalScore(playerName,score);renderLeaderboard();renderWords();
- gameOverEl.classList.remove('hidden');targetEl.classList.add('hidden');clearInterval(timerInterval);
+ gameOverEl.classList.remove('hidden');targetEl.classList.add('hidden');document.getElementById('quit-btn').classList.add('hidden');clearInterval(timerInterval);
 }
 function startGame(){
  const name=nameInput.value.trim();
  if(!name){nameInput.style.borderColor='var(--danger)';nameInput.placeholder='Vui lòng nhập tên!';return}
  nameInput.style.borderColor='var(--dark)';playerName=name;
  initAudio();if(audioCtx&&audioCtx.state==='suspended')audioCtx.resume();
- score=0;timeLeft=LV.time;lives=LV.lives;CONFIG.extendSpeed=LV.extend;CONFIG.baseRetractSpeed=LV.retract;hook.speed=LV.swing;comboCount=0;target=null;learned.clear();missed.clear();
+ try{speechSynthesis.cancel();pickVoice()}catch(e){}
+ document.getElementById('lives-box').style.display=mode==='classic'?'':'none';
+ const M=MODES[mode];GT=M.t?{time:M.t,cap:M.t,bonus:0}:{time:Infinity,cap:Infinity,bonus:0};
+ score=0;timeLeft=GT.time;lives=mode==='classic'?3:LV.lives;CONFIG.extendSpeed=LV.extend;CONFIG.baseRetractSpeed=LV.retract;hook.speed=LV.swing;comboCount=0;target=null;learned.clear();missed.clear();
  hook.length=50;hook.state='swinging';hook.grabbedItem=null;particles.length=0;notices.length=0;
  spawnItems();updateHUD();gameActive=true;
- startScreen.classList.add('hidden');gameOverEl.classList.add('hidden');targetEl.classList.remove('hidden');
+ startScreen.classList.add('hidden');gameOverEl.classList.add('hidden');targetEl.classList.remove('hidden');document.getElementById('quit-btn').classList.remove('hidden');
  clearInterval(timerInterval);
- timerInterval=setInterval(()=>{if(!gameActive)return;timeLeft--;timeEl.innerText=timeLeft;if(timeLeft<=0)triggerGameOver('HẾT GIỜ!')},1000);
+ timerInterval=setInterval(()=>{if(!gameActive||!isFinite(timeLeft))return;timeLeft--;timeEl.innerText=timeLeft;if(timeLeft<=0)triggerGameOver('HẾT GIỜ!')},1000);
+}
+function quitGame(){
+ if(!gameActive)return;
+ gameActive=false;clearInterval(timerInterval);
+ try{speechSynthesis.cancel()}catch(e){}
+ hook.length=50;hook.state='swinging';hook.grabbedItem=null;target=null;
+ targetEl.classList.add('hidden');document.getElementById('quit-btn').classList.add('hidden');
+ showStartScreen();
 }
 function showStartScreen(){startScreen.classList.remove('hidden');gameOverEl.classList.add('hidden')}
 
 window.onload=()=>{bindUI();resize();draw()};
 window.onresize=resize;
 window.onpointerdown=e=>{
- if(gameActive&&hook.state==='swinging'&&!e.target.closest('.card')&&!e.target.closest('input')){
+ if(gameActive&&hook.state==='swinging'&&!e.target.closest('.card')&&!e.target.closest('input')&&!e.target.closest('#quit-btn')){
   initAudio();if(audioCtx&&audioCtx.state==='suspended')audioCtx.resume();hook.state='extending';
  }
 };
